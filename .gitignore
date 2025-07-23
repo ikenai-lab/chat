@@ -1,0 +1,79 @@
+# === PYTHON ===
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+dist/
+build/
+*.log
+
+# Virtual environments
+.venv/
+env/
+venv/
+ENV/
+
+# Python environment and test cache
+pip-wheel-metadata/
+.cache/
+pytest_cache/
+
+# SQLite database file
+*.db
+
+# Models folder (store separately or download at runtime)
+models/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environment variable files
+.env
+.env.*
+
+# Platform-specific
+.DS_Store
+Thumbs.db
+
+# === NEXT.JS / NODE ===
+node_modules/
+.next/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-lock.yaml
+
+# Build output
+*.tsbuildinfo
+*.tgz
+
+# === TAURI / RUST ===
+/src-tauri/target/
+src-tauri/tauri-build/
+src-tauri/binaries/
+src-tauri/*.log
+src-tauri/app.manifest.json
+
+# Cargo specific
+target/
+Cargo.lock
+
+# Optional: Ignore the compiled backend binary if any
+*.exe
+*.dll
+*.bin
+*.out
+
+# === IDEs / Editors ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*.bak
+*.tmp
+
+
+localbuild.md
