@@ -1,0 +1,86 @@
+# .github/workflows/release.yml
+
+name: Release
+
+on:
+  push:
+    branches:
+      - release
+
+jobs:
+  build-tauri:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, ubuntu-latest, windows-latest]
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Rust
+        uses: actions/setup-rust@v2
+        with:
+          rust-version: stable
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install frontend dependencies
+        run: npm install
+        working-directory: ./frontend
+
+      - name: Install backend dependencies
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          pip install -r requirements.txt
+          pip install pyinstaller
+        working-directory: ./backend
+
+      - name: Build backend executable (Linux/macOS)
+        if: matrix.platform != 'windows-latest'
+        run: |
+          source venv/bin/activate
+          # Dynamically find the path to the required shared library
+          LLAMA_LIB_PATH=$(find venv -name "libllama.*" | head -n 1)
+          echo "Found libllama at: $LLAMA_LIB_PATH"
+          pyinstaller main.py --name backend --onefile --noconsole --add-data "$LLAMA_LIB_PATH:llama_cpp/lib"
+        working-directory: ./backend
+
+      - name: Build backend executable (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          ./venv/Scripts/Activate.ps1
+          # Dynamically find the path to the required DLL
+          $LLAMA_LIB_PATH = Get-ChildItem -Path ./venv -Filter "llama.dll" -Recurse | Select-Object -First 1 | ForEach-Object { $_.FullName }
+          Write-Host "Found llama.dll at: $LLAMA_LIB_PATH"
+          pyinstaller main.py --name backend --onefile --noconsole --add-data "$LLAMA_LIB_PATH;llama_cpp/lib"
+        working-directory: ./backend
+
+      - name: Copy backend to Tauri binaries
+        shell: bash
+        run: |
+          mkdir -p frontend/src-tauri/binaries
+          if [[ "${{ matrix.platform }}" == "windows-latest" ]]; then
+            cp backend/dist/backend.exe frontend/src-tauri/binaries/backend.exe
+          else
+            cp backend/dist/backend frontend/src-tauri/binaries/backend
+          fi
+
+      - name: Build Tauri application
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: ./frontend
+          
