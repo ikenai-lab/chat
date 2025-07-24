@@ -3,16 +3,31 @@
 name: Release
 
 on:
+  # This trigger runs the workflow automatically when you push to the release branch
   push:
     branches:
       - release
+  
+  # NEW: This trigger allows you to run the workflow manually from the Actions tab
+  workflow_dispatch:
+    inputs:
+      job_to_run:
+        description: 'Which job to run?'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - build
+        - release
 
-# MODIFIED: Add permissions for the GITHUB_TOKEN to create a release
 permissions:
   contents: write
 
 jobs:
   build-tauri:
+    # This job will run on a push OR if you manually select "all" or "build"
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.job_to_run == 'all' || github.event.inputs.job_to_run == 'build'))
     strategy:
       fail-fast: false
       matrix:
@@ -105,7 +120,6 @@ jobs:
         with:
           projectPath: ./frontend
           
-      # MODIFIED: This step now uploads the built artifacts instead of creating a release
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -116,23 +130,24 @@ jobs:
             frontend/src-tauri/target/release/bundle/**/*.AppImage
             frontend/src-tauri/target/release/bundle/**/*.deb
 
-  # NEW: A separate job to create the release after all builds are complete
   create-release:
+    # This job needs the build job to run first
     needs: build-tauri
+    # This job will run on a push OR if you manually select "all" or "release"
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.job_to_run == 'all' || github.event.inputs.job_to_run == 'release'))
     runs-on: ubuntu-latest
     steps:
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
           path: release-artifacts
-          merge-multiple: true # This combines artifacts from all platforms
+          merge-multiple: true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v0.1.0
           name: "Release v0.1.0"
-          # MODIFIED: The file path now points to the downloaded artifacts
-          files: "release-artifacts/*"
+          files: "release-artifacts/**/*"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
