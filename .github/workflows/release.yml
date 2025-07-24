@@ -25,7 +25,6 @@ jobs:
           node-version: '20'
 
       - name: Setup Rust
-        # MODIFIED: Updated from v2 to a current, stable version
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
@@ -35,14 +34,36 @@ jobs:
         with:
           python-version: '3.12'
 
+      # MODIFIED: Added step to install Linux/macOS system dependencies
+      - name: Install system dependencies (Linux/macOS)
+        if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-latest'
+        run: |
+          if [[ "${{ matrix.platform }}" == "ubuntu-latest" ]]; then
+            sudo apt-get update
+            sudo apt-get install -y libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+          fi
+          # macOS dependencies are usually pre-installed on GitHub runners
+
       - name: Install frontend dependencies
         run: npm install
         working-directory: ./frontend
 
-      - name: Install backend dependencies
+      - name: Install backend dependencies (Linux/macOS)
+        if: matrix.platform != 'windows-latest'
         run: |
           python -m venv venv
           source venv/bin/activate
+          pip install -r requirements.txt
+          pip install pyinstaller
+        working-directory: ./backend
+        
+      # MODIFIED: Corrected virtual environment activation for Windows
+      - name: Install backend dependencies (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          python -m venv venv
+          ./venv/Scripts/Activate.ps1
           pip install -r requirements.txt
           pip install pyinstaller
         working-directory: ./backend
@@ -51,7 +72,6 @@ jobs:
         if: matrix.platform != 'windows-latest'
         run: |
           source venv/bin/activate
-          # Dynamically find the path to the required shared library
           LLAMA_LIB_PATH=$(find venv -name "libllama.*" | head -n 1)
           echo "Found libllama at: $LLAMA_LIB_PATH"
           pyinstaller main.py --name backend --onefile --noconsole --add-data "$LLAMA_LIB_PATH:llama_cpp/lib"
@@ -62,7 +82,6 @@ jobs:
         shell: pwsh
         run: |
           ./venv/Scripts/Activate.ps1
-          # Dynamically find the path to the required DLL
           $LLAMA_LIB_PATH = Get-ChildItem -Path ./venv -Filter "llama.dll" -Recurse | Select-Object -First 1 | ForEach-Object { $_.FullName }
           Write-Host "Found llama.dll at: $LLAMA_LIB_PATH"
           pyinstaller main.py --name backend --onefile --noconsole --add-data "$LLAMA_LIB_PATH;llama_cpp/lib"
@@ -85,3 +104,13 @@ jobs:
         with:
           projectPath: ./frontend
           
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            frontend/src-tauri/target/release/bundle/**/*.msi
+            frontend/src-tauri/target/release/bundle/**/*.dmg
+            frontend/src-tauri/target/release/bundle/**/*.AppImage
+            frontend/src-tauri/target/release/bundle/**/*.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
