@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "frontend",
+  "productName": "ikenai-chat",
   "version": "0.1.0",
   "identifier": "ai.iken.chat",
   "build": {
