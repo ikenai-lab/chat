@@ -7,6 +7,10 @@ on:
     branches:
       - release
 
+# MODIFIED: Add permissions for the GITHUB_TOKEN to create a release
+permissions:
+  contents: write
+
 jobs:
   build-tauri:
     strategy:
@@ -101,16 +105,34 @@ jobs:
         with:
           projectPath: ./frontend
           
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+      # MODIFIED: This step now uploads the built artifacts instead of creating a release
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
         with:
-          # MODIFIED: Use a static tag name
-          tag_name: v0.1.0
-          name: "Release v0.1.0"
-          files: |
+          name: tauri-build-${{ matrix.platform }}
+          path: |
             frontend/src-tauri/target/release/bundle/**/*.msi
             frontend/src-tauri/target/release/bundle/**/*.dmg
             frontend/src-tauri/target/release/bundle/**/*.AppImage
             frontend/src-tauri/target/release/bundle/**/*.deb
+
+  # NEW: A separate job to create the release after all builds are complete
+  create-release:
+    needs: build-tauri
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true # This combines artifacts from all platforms
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v0.1.0
+          name: "Release v0.1.0"
+          # MODIFIED: The file path now points to the downloaded artifacts
+          files: "release-artifacts/*"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
