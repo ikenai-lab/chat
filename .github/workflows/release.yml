@@ -25,9 +25,10 @@ jobs:
           node-version: '20'
 
       - name: Setup Rust
-        uses: actions/setup-rust@v2
+        # MODIFIED: Updated from v2 to a current, stable version
+        uses: dtolnay/rust-toolchain@stable
         with:
-          rust-version: stable
+          toolchain: stable
 
       - name: Setup Python
         uses: actions/setup-python@v5
