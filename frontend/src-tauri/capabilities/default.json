@@ -6,20 +6,17 @@
     "main"
   ],
   "permissions": [
-    "shell:allow-execute",
-    "shell:allow-spawn",
-    "shell:allow-open",
+    "core:default",
+    "core:window:default",
+    "shell:default",
     {
       "identifier": "shell:allow-execute",
       "allow": [
         {
-          "name": "run-backend",
-          "sidecar": true,
-          "cmd": "binaries/backend-x86_64-unknown-linux-gnu"
+          "name": "backend-x86_64-unknown-linux-gnu",
+          "sidecar": true
         }
       ]
-    },
-    "core:default",
-    "core:window:default"
+    }
   ]
 }

@@ -20,8 +20,10 @@
       }
     ],
     "security": {
-      "csp": null
-    }
+      "csp": null,
+      "devCsp": null
+    },
+    "withGlobalTauri": false
   },
   "bundle": {
     "active": true,
@@ -35,6 +37,7 @@
     ],
     "externalBin": [
       "binaries/backend"
+      
     ]
   },
   "plugins": {
