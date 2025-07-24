@@ -38,7 +38,6 @@ jobs:
         if: matrix.platform == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          # MODIFIED: Corrected the package name for webkit2gtk
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
       - name: Install frontend dependencies
@@ -83,7 +82,6 @@ jobs:
           pyinstaller main.py --name backend --onefile --noconsole --add-data "$LLAMA_LIB_PATH;llama_cpp/lib"
         working-directory: ./backend
 
-      # MODIFIED: This step now copies the backend to the platform-specific filename Tauri expects.
       - name: Copy backend to Tauri binaries
         shell: bash
         run: |
@@ -106,6 +104,9 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
+          # MODIFIED: Use a static tag name
+          tag_name: v0.1.0
+          name: "Release v0.1.0"
           files: |
             frontend/src-tauri/target/release/bundle/**/*.msi
             frontend/src-tauri/target/release/bundle/**/*.dmg
