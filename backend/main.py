@@ -172,7 +172,7 @@ def fallback_to_manual_formatting(history: List[Dict], system_prompt: Optional[s
     Fallback method using manual prompt construction with a generic template.
     This serves as a backup if create_chat_completion fails.
     """
-    full_prompt = ""
+    full_prompt = "You are an AI Assistant. Respond to the user's message based on the conversation history. **Always use github style markdown** \n\n"
     
     # Add system prompt if provided
     if system_prompt:
