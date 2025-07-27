@@ -34,6 +34,7 @@ export interface SystemPrompt {
 export default function Home() {
   const [selectedModel, setSelectedModel] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useLocalStorage('isSidebarCollapsed', false);
   const [isParamsSidebarOpen, setIsParamsSidebarOpen] = useState(false);
   const [isPromptsDialogOpen, setIsPromptsDialogOpen] = useState(false);
@@ -59,6 +60,8 @@ export default function Home() {
   const activeChat = sessions.find(session => session.id === activeChatId);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
   
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   const fetchSessions = useCallback(async (callback?: (sessions: ChatSession[]) => void) => {
     try {
       const response = await fetch("http://localhost:8000/api/v1/sessions");
@@ -187,7 +190,8 @@ export default function Home() {
     if (!selectedModel) { toast.error("Please select a model first."); return; }
     if (!activeChatId) { toast.error("Please start a new chat first."); return; }
     
-    setIsLoading(true);
+    setIsStreaming(true);
+    abortControllerRef.current = new AbortController();
     const shouldGenerateTitle = activeMessages.length === 0 && !isRegeneration;
     
     if (!isRegeneration) {
@@ -198,6 +202,7 @@ export default function Home() {
       const response = await fetch("http://localhost:8000/api/v1/chat/stream", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_id: activeChatId, prompt }),
+        signal: abortControllerRef.current.signal,
       });
       if (!response.body) throw new Error("Response body is null");
 
@@ -237,21 +242,31 @@ export default function Home() {
         await fetchSessions();
       }
 
-    } catch (error) {
-      toast.error("An error occurred while communicating with the model.");
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        toast.info("Generation stopped.");
+      } else {
+        toast.error("An error occurred while communicating with the model.");
+      }
       setActiveMessages(prev => prev.slice(0, -1));
     } finally {
-      setIsLoading(false);
+      setIsStreaming(false);
+      abortControllerRef.current = null;
     }
   };
 
   const handleRegenerateResponse = () => {
-    if (isLoading || activeMessages.length < 1) return;
+    if (isStreaming || activeMessages.length < 1) return;
     const lastUserMessage = activeMessages.filter(m => m.role === 'user').pop();
     if (lastUserMessage) {
-        // Remove the last assistant message before regenerating
         setActiveMessages(prev => prev.slice(0, -1));
         handleSendMessage(lastUserMessage.content, true);
+    }
+  };
+
+  const handleStopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
     }
   };
 
@@ -348,7 +363,7 @@ export default function Home() {
 
   return (
     <>
-      <div className="flex min-h-screen bg-white text-slate-600">
+      <div className="flex h-screen overflow-hidden bg-white text-slate-600">
         <Sidebar 
           isCollapsed={isSidebarCollapsed}
           onCollapseToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
@@ -360,18 +375,34 @@ export default function Home() {
           onPromptsToggle={() => setIsPromptsDialogOpen(true)}
           onModelsToggle={() => setIsModelsDialogOpen(true)}
         />
-        <main className="flex-1 flex flex-col p-4 sm:p-6 md:p-8 h-screen overflow-hidden">
-          <ChatHeader 
-            selectedModel={selectedModel} 
-            onModelChange={handleModelChange}
-            onParametersToggle={() => setIsParamsSidebarOpen(true)}
-            prompts={prompts}
-            activeSystemPromptId={activeChat?.system_prompt_id || null}
-            onSystemPromptChange={handleSystemPromptChange}
-            localModels={localModels}
-          />
-          <ChatMessageList messages={activeMessages} isLoading={isLoading} onRegenerate={handleRegenerateResponse} />
-          <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+        <main className="flex-1 flex flex-col p-4 sm:p-6 md:p-8 overflow-hidden">
+          {/* This container centers the content and sets up the main flex column layout */}
+            
+            {/* 1. Sticky Header */}
+            
+              <ChatHeader 
+                selectedModel={selectedModel} 
+                onModelChange={handleModelChange}
+                onParametersToggle={() => setIsParamsSidebarOpen(true)}
+                prompts={prompts}
+                activeSystemPromptId={activeChat?.system_prompt_id || null}
+                onSystemPromptChange={handleSystemPromptChange}
+                localModels={localModels}
+              />
+
+
+            {/* 2. Scrollable Content Area */}
+            {/* `flex-1` makes it take up remaining space, `min-h-0` is crucial for flex overflow */}
+            
+              <ChatMessageList messages={activeMessages} isLoading={isStreaming} onRegenerate={handleRegenerateResponse} />
+          
+            
+            {/* 3. Sticky Input Footer */}
+            
+                <ChatInput onSendMessage={handleSendMessage} isLoading={isStreaming} onStopGeneration={handleStopGeneration} />
+            
+
+          
         </main>
         <ParametersSidebar 
           isOpen={isParamsSidebarOpen}

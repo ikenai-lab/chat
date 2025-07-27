@@ -3,12 +3,9 @@
 name: Release
 
 on:
-  # This trigger runs the workflow automatically when you push to the release branch
   push:
     branches:
       - release
-  
-  # NEW: This trigger allows you to run the workflow manually from the Actions tab
   workflow_dispatch:
     inputs:
       job_to_run:
@@ -26,12 +23,11 @@ permissions:
 
 jobs:
   build-tauri:
-    # This job will run on a push OR if you manually select "all" or "build"
-    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.job_to_run == 'all' || github.event.inputs.job_to_run == 'build'))
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-latest, windows-latest]
+        # MODIFIED: Pinned macOS version for stability
+        platform: [macos-14, ubuntu-latest, windows-latest]
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -96,9 +92,7 @@ jobs:
         shell: pwsh
         run: |
           ./venv/Scripts/Activate.ps1
-          $LLAMA_LIB_PATH = Get-ChildItem -Path ./venv -Filter "llama.dll" -Recurse | Select-Object -First 1 | ForEach-Object { $_.FullName }
-          Write-Host "Found llama.dll at: $LLAMA_LIB_PATH"
-          pyinstaller main.py --name backend --onefile --noconsole --add-data "$LLAMA_LIB_PATH;llama_cpp/lib"
+          pyinstaller main.py --name backend --onefile --noconsole --add-data "venv/Lib/site-packages/llama_cpp/lib/llama.dll;llama_cpp/lib"
         working-directory: ./backend
 
       - name: Copy backend to Tauri binaries
@@ -106,11 +100,9 @@ jobs:
         run: |
           mkdir -p frontend/src-tauri/binaries
           if [[ "${{ matrix.platform }}" == "windows-latest" ]]; then
-            cp backend/dist/backend.exe "frontend/src-tauri/binaries/backend-x86_64-pc-windows-msvc.exe"
-          elif [[ "${{ matrix.platform }}" == "macos-latest" ]]; then
-            cp backend/dist/backend "frontend/src-tauri/binaries/backend-aarch64-apple-darwin"
+            cp backend/dist/backend.exe frontend/src-tauri/binaries/backend.exe
           else
-            cp backend/dist/backend "frontend/src-tauri/binaries/backend-x86_64-unknown-linux-gnu"
+            cp backend/dist/backend frontend/src-tauri/binaries/backend
           fi
 
       - name: Build Tauri application
@@ -131,9 +123,7 @@ jobs:
             frontend/src-tauri/target/release/bundle/**/*.deb
 
   create-release:
-    # This job needs the build job to run first
     needs: build-tauri
-    # This job will run on a push OR if you manually select "all" or "release"
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.job_to_run == 'all' || github.event.inputs.job_to_run == 'release'))
     runs-on: ubuntu-latest
     steps:

@@ -3,7 +3,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { RefreshCw, Copy } from "lucide-react";
 import * as marked from 'marked';
 import hljs from 'highlight.js';
@@ -73,44 +73,52 @@ function setupMarkdownRenderer() {
 }
 
 export function ChatMessageList({ messages, isLoading, onRegenerate }: ChatMessageListProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
+  // --- START OF SCROLLING FIX ---
+
+  // Ref for the scrollable container div
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // Ref for the empty div at the bottom of the list, used as a scroll target
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // Ref to track if the user is scrolled to the bottom.
+  // We default to true so the chat scrolls down on initial load.
+  const isAtBottomRef = useRef(true);
+
+  // This effect sets up a scroll listener to update isAtBottomRef.
+  // It runs only once when the component mounts.
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      // Check if the scroll position is at the bottom (with a 10px tolerance)
+      const isAtBottom = container.scrollHeight - container.clientHeight <= container.scrollTop + 10;
+      isAtBottomRef.current = isAtBottom;
+    };
+
+    container.addEventListener('scroll', handleScroll);
+
+    // Cleanup the event listener on component unmount
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
+  // This effect handles the automatic scrolling.
+  // It runs every time the `messages` array is updated.
+  useEffect(() => {
+    // If the user was at the bottom before the new message arrived, scroll down.
+    if (isAtBottomRef.current && scrollRef.current) {
+      // 'auto' provides an instant scroll, which is better for chat UIs.
+      scrollRef.current.scrollIntoView({ behavior: "auto" });
+    }
+  }, [messages]); // Dependency on `messages` triggers this on new content
+
+  // --- END OF SCROLLING FIX ---
+
 
   useEffect(() => {
     setupMarkdownRenderer();
   }, []);
-
-  useEffect(() => {
-    const handleUserScroll = (e: WheelEvent | TouchEvent | KeyboardEvent) => {
-      setAutoScrollEnabled(false);
-    };
-
-    const container = scrollContainerRef.current;
-    if (container) {
-      container.addEventListener("wheel", handleUserScroll);
-      container.addEventListener("touchmove", handleUserScroll);
-      window.addEventListener("keydown", handleUserScroll);
-    }
-
-    return () => {
-      if (container) {
-        container.removeEventListener("wheel", handleUserScroll);
-        container.removeEventListener("touchmove", handleUserScroll);
-      }
-      window.removeEventListener("keydown", handleUserScroll);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (autoScrollEnabled && scrollRef.current) {
-      scrollRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages]);
-
-  useEffect(() => {
-    setAutoScrollEnabled(true);
-  }, [messages.length]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
