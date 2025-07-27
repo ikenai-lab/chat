@@ -26,7 +26,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # MODIFIED: Pinned macOS version for stability
         platform: [macos-14, ubuntu-latest, windows-latest]
 
     runs-on: ${{ matrix.platform }}
@@ -55,8 +54,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: frontend/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
       - name: Install frontend dependencies
-        run: npm install
+        run: npm ci
         working-directory: ./frontend
 
       - name: Install backend dependencies (Linux/macOS)
@@ -87,7 +94,6 @@ jobs:
           pyinstaller main.py --name backend --onefile --noconsole --add-data "$LLAMA_LIB_PATH:llama_cpp/lib"
         working-directory: ./backend
 
-      # MODIFIED: This step now uses a robust, relative path for the DLL.
       - name: Build backend executable (Windows)
         if: matrix.platform == 'windows-latest'
         shell: pwsh
@@ -96,14 +102,17 @@ jobs:
           pyinstaller main.py --name backend --onefile --noconsole --add-data "venv/Lib/site-packages/llama_cpp/lib/llama.dll;llama_cpp/lib"
         working-directory: ./backend
 
+      # MODIFIED: This step now copies the backend to the platform-specific filename Tauri expects.
       - name: Copy backend to Tauri binaries
         shell: bash
         run: |
           mkdir -p frontend/src-tauri/binaries
           if [[ "${{ matrix.platform }}" == "windows-latest" ]]; then
-            cp backend/dist/backend.exe frontend/src-tauri/binaries/backend.exe
+            cp backend/dist/backend.exe "frontend/src-tauri/binaries/backend-x86_64-pc-windows-msvc.exe"
+          elif [[ "${{ matrix.platform }}" == "macos-14" ]]; then
+            cp backend/dist/backend "frontend/src-tauri/binaries/backend-aarch64-apple-darwin"
           else
-            cp backend/dist/backend frontend/src-tauri/binaries/backend
+            cp backend/dist/backend "frontend/src-tauri/binaries/backend-x86_64-unknown-linux-gnu"
           fi
 
       - name: Build Tauri application
