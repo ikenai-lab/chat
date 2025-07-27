@@ -26,7 +26,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-latest, windows-latest]
+        # MODIFIED: Pinned macOS version for stability
+        platform: [macos-14, ubuntu-latest, windows-latest]
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -100,11 +101,9 @@ jobs:
         run: |
           mkdir -p frontend/src-tauri/binaries
           if [[ "${{ matrix.platform }}" == "windows-latest" ]]; then
-            cp backend/dist/backend.exe "frontend/src-tauri/binaries/backend-x86_64-pc-windows-msvc.exe"
-          elif [[ "${{ matrix.platform }}" == "macos-latest" ]]; then
-            cp backend/dist/backend "frontend/src-tauri/binaries/backend-aarch64-apple-darwin"
+            cp backend/dist/backend.exe frontend/src-tauri/binaries/backend.exe
           else
-            cp backend/dist/backend "frontend/src-tauri/binaries/backend-x86_64-unknown-linux-gnu"
+            cp backend/dist/backend frontend/src-tauri/binaries/backend
           fi
 
       - name: Build Tauri application
